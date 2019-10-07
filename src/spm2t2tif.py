@@ -96,20 +96,21 @@ def maskSpmT(spmTmapPath, threshold):
     print(spmT_data.get_data().shape)
 
     spmT_orig = spmT_data.get_data()
+
     if (len(spmT_orig.shape) == 3):
         spmT_nochannel = spmT_orig
     else:
-        spmT_nochannel = spmT_data.get_data()[:, :, :, 0]
+        spmT_nochannel = spmT_orig[:, :, :, 0]
 
-    spmT_max = np.amax(spmT_nochannel)
-
-    if (threshold == None):
-        threshold = PT_p_factor * spmT_max
-
-    print("spmT_max", spmT_max)
     print("threshold", threshold)
     noNanMask = np.isnan(spmT_nochannel)
     spmT_nochannel[noNanMask] = 0.0
+
+    spmT_max = np.amax(spmT_nochannel)
+    print("spmT_max", spmT_max)
+    if (threshold == None):
+        threshold = PT_p_factor * spmT_max
+
     thresholdMask = spmT_nochannel <= threshold
     spmT_nochannel[thresholdMask] = 0.0
 
@@ -117,12 +118,19 @@ def maskSpmT(spmTmapPath, threshold):
 
 
 def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outputFolder):
-    my_norm = matplotlib.colors.Normalize(
-        clip=False)
+    if (threshold == None):
+        # for pt use log scale
+        my_norm = matplotlib.colors.LogNorm(clip=False)
+        threshold = spmT_max * PT_p_factor
+        colormapName = 'jet'
+    else:
+        my_norm = matplotlib.colors.Normalize(
+            clip=False)
+        colormapName = 'jet'
 
     # CHANGE COLORMAP HERE  https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
 
-    my_cmap = copy(cm.get_cmap('summer'))
+    my_cmap = copy(cm.get_cmap(colormapName))
     my_cmap.set_under('w', alpha=0)
     my_cmap.set_bad('w', alpha=0)
 
@@ -130,8 +138,6 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outpu
         nrows=rownum, ncols=colnum, figsize=(colnum, rownum), facecolor=(0, 0, 0))
 
     # threshold_removeFS = str(threshold).replace(".", "_")
-    if (threshold == None):
-        threshold = spmT_max * PT_p_factor
 
     for i in range(int(rownum*colnum)):
         row = int(np.floor(i/colnum))
