@@ -6,3 +6,5 @@ Python version 3.5.2
 ```shell
     python src/spm2t2tif.py ANATOMICAL OVERLAY_SUBJ THRESHOLD
 ```
+
+![Example Image](montage.png)
