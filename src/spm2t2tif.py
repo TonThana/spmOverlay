@@ -13,17 +13,25 @@ import sys
 from pathlib import Path
 import collections
 import os
-import errno
+from functools import reduce
+
+PT_p_factor = 0.001
+
+
+def factors(n):
+    return tuple(reduce(list.__add__,
+                        ([i, n//i] for i in range(1, int(n**0.5) + 1) if n % i == 0)))
+# (1, 24, 2, 12, 3, 8, 4, 6)
 
 
 def normalizeAnatomy(anatomy):
     sc_sd1 = 3.5  # Global +- *std range
     sc_sd = 2.0  # Local Slice +- *std range
     zero4b = 7.0
-    max_int = np.amax(anatomy)
+    # max_int = np.amax(anatomy)
     min_int = np.amin(anatomy)
-    max_anat_value = np.amax(anatomy)
-    min_anat_value = np.amin(anatomy)
+    # max_anat_value = np.amax(anatomy)
+    # min_anat_value = np.amin(anatomy)
     xw, yw, zw = anatomy.shape
     AnatR = anatomy - min_int
     Ar = np.reshape(AnatR, (zw*yw*xw, 1))
@@ -85,30 +93,49 @@ def normalizeAnatomy(anatomy):
 
 def maskSpmT(spmTmapPath, threshold):
     spmT_data = nibabel.load(spmTmapPath)
-    spmT_nochannel = spmT_data.get_data()[:, :, :, 0]
+    print(spmT_data.get_data().shape)
+
+    spmT_orig = spmT_data.get_data()
+    if (len(spmT_orig.shape) == 3):
+        spmT_nochannel = spmT_orig
+    else:
+        spmT_nochannel = spmT_data.get_data()[:, :, :, 0]
+
+    spmT_max = np.amax(spmT_nochannel)
+
+    if (threshold == None):
+        threshold = PT_p_factor * spmT_max
+
+    print("spmT_max", spmT_max)
+    print("threshold", threshold)
     noNanMask = np.isnan(spmT_nochannel)
     spmT_nochannel[noNanMask] = 0.0
     thresholdMask = spmT_nochannel <= threshold
     spmT_nochannel[thresholdMask] = 0.0
-    spmT_max = np.amax(spmT_nochannel)
+
     return spmT_nochannel, spmT_max
 
 
-def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max):
+def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outputFolder):
     my_norm = matplotlib.colors.Normalize(
         clip=False)
-    my_cmap = copy(cm.get_cmap('inferno'))
+
+    # CHANGE COLORMAP HERE  https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+
+    my_cmap = copy(cm.get_cmap('summer'))
     my_cmap.set_under('w', alpha=0)
     my_cmap.set_bad('w', alpha=0)
 
     fig, axs = plt.subplots(
-        nrows=6, ncols=4, figsize=(4, 6), facecolor=(0, 0, 0))
+        nrows=rownum, ncols=colnum, figsize=(colnum, rownum), facecolor=(0, 0, 0))
 
-    # fig.dpi = 1000
+    # threshold_removeFS = str(threshold).replace(".", "_")
+    if (threshold == None):
+        threshold = spmT_max * PT_p_factor
 
-    for i in range(int(6*4)):
-        row = int(np.floor(i/4))
-        col = int(i % 4)
+    for i in range(int(rownum*colnum)):
+        row = int(np.floor(i/colnum))
+        col = int(i % colnum)
         ax = axs[row, col]
         ax.imshow(np.rot90(Anat[:, :, i]),
                   cmap='gray', interpolation='nearest')
@@ -121,7 +148,18 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max):
                          interpolation='nearest')
         ax.axis('off')
         ax.set_aspect('equal')
-        if (row == 0 and col == 3):
+
+        # Saving indiv slice still broken (contaminated with 0S somthing...)
+
+        # extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+
+        # print('{outputFolder}/overlay_slice{sli}_th{threshold}.png'.format(
+        #     sli=i, threshold=threshold_removeFS, outputFolder=outputFolder))
+
+        # fig.savefig('{outputFolder}/overlay_slice{sli}_th{threshold}.png'.format(
+        #     sli=i, threshold=threshold_removeFS, outputFolder=outputFolder), bbox_inches=extent, dpi=800, facecolor=fig.get_facecolor(),  pad_inches=0)
+
+        if (row == 0 and col == colnum-1):
             axins = inset_axes(parent_axes=ax, height="200%",
                                width="5%", loc='upper right', borderpad=0)
             axins.yaxis.set_ticks_position('left')
@@ -134,22 +172,43 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max):
 
 def main(t1ImgPath, spmTmapPath, threshold):
     # print(t1ImgPath, spmTmapPath, threshold)
+
     t1w_data = nibabel.load(t1ImgPath)
     anatomy = t1w_data.get_data()[:, :, :, 0]
     Anat, xw, yw, zw = normalizeAnatomy(anatomy)
     spmT_nochannel, spmT_max = maskSpmT(spmTmapPath, threshold)
+    spm_x, spm_y, spm_z = spmT_nochannel.shape
     # 1) CHECK DIM
+    if (spm_x != xw or spm_y != yw or spm_z != zw):
+        raise Exception('Dimension of overlay subject and template mismatch')
+
     # 2) BASE ON DIM - MONTAGE ROW AND COL -> pass to plotOverlay
+    factors_list = factors(zw)
+    rownum = factors_list[-1]
+    colnum = factors_list[-2]
+    print("ROW * COL", int(rownum*colnum))
+    assert (int(rownum * colnum) ==
+            zw), "something went wrong with slice number factorisation"
+
     # 3) In plotOverlay save each overlayed slice with unique name into folder {parent}/PNG_RESULT_PY/ (os.makedirs this)
     # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory
 
     spmFolder = Path(spmTmapPath).parent
-    fig = plotOverlay(Anat, spmT_nochannel, threshold, spmT_max)
+    print("***OUTPUT FOLDER: ", spmFolder)
+    outputFolder = "{parent}/PNG_RESULT_PY".format(parent=spmFolder)
+
+    try:
+        os.makedirs(outputFolder)
+    except FileExistsError:
+        print('{parent} FOLDER already exist'.format(parent=outputFolder))
+
+    fig = plotOverlay(Anat, spmT_nochannel, threshold,
+                      spmT_max, rownum, colnum, outputFolder)
 
     outputFileName = '{parent}/montage.png'.format(
-        parent=spmFolder)
+        parent=outputFolder)
     # print(outputFileName)
-    fig.savefig(Path(outputFileName), bbox_inches='tight', pad_inches=0,
+    fig.savefig(outputFileName, bbox_inches='tight', pad_inches=0,
                 dpi=1000, facecolor=fig.get_facecolor())
 
 
@@ -162,6 +221,11 @@ if __name__ == '__main__':
 
     t1ImgPath = str(args[1])
     spmTmapPath = str(args[2])
-    threshold = float(args[3])
+    print(Path(spmTmapPath).name)
+    if (Path(spmTmapPath).name == "PT.img"):
+        threshold = None  # leave blank first
+    else:
+        threshold = float(args[3])
+    # print(Path(spmTmapPath))
 
     main(t1ImgPath, spmTmapPath, threshold)
