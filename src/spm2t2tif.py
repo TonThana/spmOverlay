@@ -126,7 +126,7 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outpu
     else:
         my_norm = matplotlib.colors.Normalize(
             clip=False)
-        colormapName = 'jet'
+        colormapName = 'spring'
 
     # CHANGE COLORMAP HERE  https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
 
