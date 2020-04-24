@@ -138,8 +138,24 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outpu
         nrows=rownum, ncols=colnum, figsize=(colnum, rownum), facecolor=(0, 0, 0))
 
     # threshold_removeFS = str(threshold).replace(".", "_")
-
+    xw = None
+    yw = None
     for i in range(int(rownum*colnum)):
+        # print(xw, yw)
+        if (i == 19):
+            row = int(np.floor(i/colnum))
+            col = int(i % colnum)
+            ax = axs[row, col]
+            ax.imshow(np.zeros(shape=(xw, yw)),
+                      cmap='gray', interpolation='nearest')
+            ax.axis('off')
+            ax.set_aspect('equal')
+            continue
+
+        if (i == 0):
+            xw = Anat.shape[0]
+            yw = Anat.shape[1]
+
         row = int(np.floor(i/colnum))
         col = int(i % colnum)
         ax = axs[row, col]
@@ -150,7 +166,7 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outpu
                          norm=my_norm,
                          vmin=threshold,
                          vmax=spmT_max,
-                         alpha=0.5,
+                         alpha=0.85,
                          interpolation='nearest')
         ax.axis('off')
         ax.set_aspect('equal')
@@ -189,14 +205,17 @@ def main(t1ImgPath, spmTmapPath, threshold):
         raise Exception('Dimension of overlay subject and template mismatch')
 
     # 2) BASE ON DIM - MONTAGE ROW AND COL -> pass to plotOverlay
-    factors_list = factors(zw)
-    rownum = factors_list[-1]
-    colnum = factors_list[-2]
-    print("ROWNUM={}".format(rownum))
-    print("COLNUM={}".format(colnum))
-    print("ROW * COL", int(rownum*colnum))
-    assert (int(rownum * colnum) ==
-            zw), "something went wrong with slice number factorisation"
+    # factors_list = factors(zw)
+    # rownum = factors_list[-1]
+    # colnum = factors_list[-2]
+    # print("ROWNUM={}".format(rownum))
+    # print("COLNUM={}".format(colnum))
+    # print("ROW * COL", int(rownum*colnum))
+    # assert (int(rownum * colnum) ==
+    #         zw), "something went wrong with slice number factorisation"
+
+    rownum = 5
+    colnum = 4
 
     # 3) In plotOverlay save each overlayed slice with unique name into folder {parent}/PNG_RESULT_PY/ (os.makedirs this)
     # https://stackoverflow.com/questions/273192/how-can-i-safely-create-a-nested-directory

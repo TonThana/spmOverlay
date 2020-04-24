@@ -1,3 +1,4 @@
+#  specifically for aj. panitha j.
 
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
@@ -15,7 +16,7 @@ import collections
 import os
 from functools import reduce
 
-PT_p_factor = 0.001
+PT_p_factor = 0.005
 
 
 def factors(n):
@@ -134,46 +135,25 @@ def plotOverlay(Anat, spmT_nochannel, threshold, spmT_max, rownum, colnum, outpu
     my_cmap.set_under('w', alpha=0)
     my_cmap.set_bad('w', alpha=0)
 
-    fig, axs = plt.subplots(
-        nrows=rownum, ncols=colnum, figsize=(colnum, rownum), facecolor=(0, 0, 0))
-
-    # threshold_removeFS = str(threshold).replace(".", "_")
-
+    plt.style.use('dark_background')
     for i in range(int(rownum*colnum)):
-        row = int(np.floor(i/colnum))
-        col = int(i % colnum)
-        ax = axs[row, col]
+        fig, ax = plt.subplots()
+
         ax.imshow(np.rot90(Anat[:, :, i]),
                   cmap='gray', interpolation='nearest')
-        tmap = ax.imshow(np.rot90(spmT_nochannel[:, :, i]),
-                         cmap=my_cmap,
-                         norm=my_norm,
-                         vmin=threshold,
-                         vmax=spmT_max,
-                         alpha=0.5,
-                         interpolation='nearest')
+        ax.imshow(np.rot90(spmT_nochannel[:, :, i]),  cmap=my_cmap,
+                  norm=my_norm,
+                  vmin=threshold,
+                  vmax=spmT_max,
+                  alpha=1,
+                  interpolation='nearest')
         ax.axis('off')
         ax.set_aspect('equal')
-
-        # Saving indiv slice still broken (contaminated with 0S somthing...)
-
-        # extent = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-
-        # print('{outputFolder}/overlay_slice{sli}_th{threshold}.png'.format(
-        #     sli=i, threshold=threshold_removeFS, outputFolder=outputFolder))
-
-        # fig.savefig('{outputFolder}/overlay_slice{sli}_th{threshold}.png'.format(
-        #     sli=i, threshold=threshold_removeFS, outputFolder=outputFolder), bbox_inches=extent, dpi=800, facecolor=fig.get_facecolor(),  pad_inches=0)
-
-        if (row == 0 and col == colnum-1):
-            axins = inset_axes(parent_axes=ax, height="200%",
-                               width="5%", loc='upper right', borderpad=0)
-            axins.yaxis.set_ticks_position('left')
-            axins.tick_params(colors='w', labelsize=5.0)
-            cbar = fig.colorbar(tmap, cax=axins)
-            cbar.set_alpha(1)
-            cbar.draw_all()
-    return fig
+        outputFileName = '{parent}/slice_{slicenumber}.png'.format(
+            parent=outputFolder, slicenumber=i+1)
+        # print(outputFileName)
+        fig.savefig(outputFileName,
+                    dpi=500, facecolor=fig.get_facecolor())
 
 
 def main(t1ImgPath, spmTmapPath, threshold):
@@ -192,8 +172,6 @@ def main(t1ImgPath, spmTmapPath, threshold):
     factors_list = factors(zw)
     rownum = factors_list[-1]
     colnum = factors_list[-2]
-    print("ROWNUM={}".format(rownum))
-    print("COLNUM={}".format(colnum))
     print("ROW * COL", int(rownum*colnum))
     assert (int(rownum * colnum) ==
             zw), "something went wrong with slice number factorisation"
@@ -210,14 +188,8 @@ def main(t1ImgPath, spmTmapPath, threshold):
     except FileExistsError:
         print('{parent} FOLDER already exist'.format(parent=outputFolder))
 
-    fig = plotOverlay(Anat, spmT_nochannel, threshold,
-                      spmT_max, rownum, colnum, outputFolder)
-
-    outputFileName = '{parent}/montage.png'.format(
-        parent=outputFolder)
-    # print(outputFileName)
-    fig.savefig(outputFileName, bbox_inches='tight', pad_inches=0,
-                dpi=1000, facecolor=fig.get_facecolor())
+    plotOverlay(Anat, spmT_nochannel, threshold,
+                spmT_max, rownum, colnum, outputFolder)
 
 
 if __name__ == '__main__':
